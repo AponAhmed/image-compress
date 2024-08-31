@@ -39,6 +39,7 @@ import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
+import javax.swing.JOptionPane;
 import javax.swing.SwingWorker;
 import javax.swing.Timer;
 import javax.swing.border.Border;
@@ -647,8 +648,8 @@ public class Main extends javax.swing.JFrame {
         openDirLbl.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                // Define the directory you want to open
-                File dir = new File(path.getText() + "\\" + outputDir.getText());
+                // Define the directory you want to open, using the system's file separator
+                File dir = new File(path.getText() + File.separator + outputDir.getText());
 
                 // Check if the directory exists
                 if (dir.exists() && dir.isDirectory()) {
@@ -656,10 +657,13 @@ public class Main extends javax.swing.JFrame {
                         // Open the directory in the system's file explorer
                         Desktop.getDesktop().open(dir);
                     } catch (IOException ex) {
+                        // Show a dialog if an error occurs
+                        JOptionPane.showMessageDialog(null, "Failed to open the directory: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
                         ex.printStackTrace();
                     }
                 } else {
-                    System.out.print("Directory does not exist!");
+                    // Show a dialog if the directory does not exist
+                    JOptionPane.showMessageDialog(null, "Directory does not exist!", "Warning", JOptionPane.WARNING_MESSAGE);
                 }
             }
         });
@@ -877,12 +881,10 @@ public class Main extends javax.swing.JFrame {
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addComponent(jSeparator1))
             .addGroup(TopPanelLayout.createSequentialGroup()
-                .addContainerGap(39, Short.MAX_VALUE)
-                .addComponent(jSeparator2, javax.swing.GroupLayout.PREFERRED_SIZE, 616, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(39, Short.MAX_VALUE))
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, TopPanelLayout.createSequentialGroup()
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addComponent(browseArea, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGroup(TopPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jSeparator2, javax.swing.GroupLayout.PREFERRED_SIZE, 616, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(browseArea, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         TopPanelLayout.setVerticalGroup(
@@ -1593,8 +1595,6 @@ public class Main extends javax.swing.JFrame {
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JLabel CompressBylbl;
-    private javax.swing.JLabel CompressBylbl1;
-    private javax.swing.JLabel CompressBylbl3;
     private javax.swing.JLabel CompressBylbl4;
     private javax.swing.JPanel DimCompression;
     private javax.swing.JPanel GenerateProgress;
@@ -1611,8 +1611,6 @@ public class Main extends javax.swing.JFrame {
     private javax.swing.JLabel browseSelectionInfo;
     private javax.swing.JButton btnBrowse;
     private javax.swing.JPanel byOption;
-    private javax.swing.JPanel byOption1;
-    private javax.swing.JPanel byOption2;
     private javax.swing.JRadioButton compressByDim;
     private javax.swing.JRadioButton compressByPercentage;
     private javax.swing.JRadioButton compressBySize;
@@ -1635,8 +1633,6 @@ public class Main extends javax.swing.JFrame {
     private javax.swing.JPanel jPanel17;
     private javax.swing.JPanel jPanel18;
     private javax.swing.JPanel jPanel19;
-    private javax.swing.JPanel jPanel20;
-    private javax.swing.JPanel jPanel21;
     private javax.swing.JPanel jPanel22;
     private javax.swing.JPanel jPanel23;
     private javax.swing.JPanel jPanel24;
