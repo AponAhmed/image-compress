@@ -9,6 +9,7 @@ import java.awt.Color;
 import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.FileDialog;
+import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.datatransfer.DataFlavor;
@@ -53,7 +54,9 @@ import javax.swing.event.ChangeListener;
 public class Main extends javax.swing.JFrame {
 
     // Define supported image extensions as a static final array
-    private static final String[] IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".webp", ".gif", ".bmp"};
+    private Color backgroundColor = Color.BLACK; // Class property for background color
+
+    private static final String[] IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"};
     private List<ImageIcon> generateIcons;
     private Timer animationTimer;
 
@@ -364,6 +367,24 @@ public class Main extends javax.swing.JFrame {
             enhancementFactor /= 100.0f; // Convert to [0.0f, 1.0f] range
             image = enhanceColor(image, enhancementFactor);
         }
+
+        if (image.getType() == 6) {
+            // Create a new BufferedImage with the same dimensions and a solid background color
+            BufferedImage imageWithBackground = new BufferedImage(
+                    image.getWidth(),
+                    image.getHeight(),
+                    BufferedImage.TYPE_INT_ARGB
+            );
+
+            // Fill the background
+            Graphics2D g = imageWithBackground.createGraphics();
+            g.setColor(backgroundColor);
+            g.fillRect(0, 0, imageWithBackground.getWidth(), imageWithBackground.getHeight());
+            g.drawImage(image, 0, 0, null);
+            g.dispose();
+            image = imageWithBackground; // Use the new image with background
+        }
+
         return image;
     }
 
@@ -419,6 +440,17 @@ public class Main extends javax.swing.JFrame {
         // Enhance the color of the original image
         BufferedImage enhancedImage = preModify(originalImage);
 
+        // Check if the format is JPG or WEBP and handle the background color for PNG
+        // Convert to RGB if the selected format is JPG
+        
+        if ("jpg".equalsIgnoreCase(selectedFormat)) {
+            BufferedImage rgbImage = new BufferedImage(enhancedImage.getWidth(), enhancedImage.getHeight(), BufferedImage.TYPE_INT_RGB);
+            Graphics g = rgbImage.getGraphics();
+            g.drawImage(enhancedImage, 0, 0, null);
+            g.dispose();
+            enhancedImage = rgbImage; // Use the RGB image for further processing
+        }
+        
         // Get an ImageWriter for the desired output format (e.g., JPG, PNG, WEBP)
         ImageWriter imageWriter = null;
         ImageWriteParam imageWriteParam = null;
