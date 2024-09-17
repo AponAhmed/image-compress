@@ -5,12 +5,14 @@ import com.formdev.flatlaf.FlatLaf;
 
 import com.formdev.flatlaf.themes.FlatMacLightLaf;
 import com.luciad.imageio.webp.WebPWriteParam;
+import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.FileDialog;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Insets;
 import java.awt.RenderingHints;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
@@ -32,7 +34,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
@@ -40,12 +44,20 @@ import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JColorChooser;
+import javax.swing.JFrame;
 import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
 import javax.swing.SwingWorker;
 import javax.swing.Timer;
 import javax.swing.border.Border;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 
 /**
  *
@@ -54,15 +66,17 @@ import javax.swing.event.ChangeListener;
 public class Main extends javax.swing.JFrame {
 
     // Define supported image extensions as a static final array
-    private Color backgroundColor = Color.BLACK; // Class property for background color
+    private Color backgroundColor = Color.decode("#f9f9f9");
 
     private static final String[] IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"};
     private List<ImageIcon> generateIcons;
     private Timer animationTimer;
+    private int TotalImageCount;
 
     public Main() {
         WindowIconSetter.setIcon(this);
         initComponents();
+        bgColor.setBackground(backgroundColor);
         generateProgress.setVisible(false);
         openDirLbl.setVisible(false);
         generateIcons = new ArrayList<>();
@@ -146,9 +160,87 @@ public class Main extends javax.swing.JFrame {
         generateImage.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                compressImages();
+                if (savedData.length > 0 && TotalImageCount > savedData.length) {
+                    // Show confirmation dialog
+                    int confirm = JOptionPane.showConfirmDialog(
+                            null, // Parent component
+                            "Total image count exceeds Rename data. Do you want to proceed with default with rest ?", // Message
+                            "Confirm", // Title of the dialog
+                            JOptionPane.YES_NO_OPTION, // Option type
+                            JOptionPane.QUESTION_MESSAGE // Message type
+                    );
+
+                    // Check the user's response
+                    if (confirm == JOptionPane.YES_OPTION) {
+                        compressImages(); // Proceed with compression if user confirms
+                    }
+                    // If user selects NO, do nothing (or add additional logic if needed)
+                } else {
+                    compressImages(); // Proceed without confirmation if condition is not met
+                }
             }
         });
+
+        jLabel5.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                openSupportingWindow();
+            }
+        });
+
+        bgColorTxt.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                updateBackgroundColor();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                updateBackgroundColor();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                updateBackgroundColor();
+            }
+
+            private void updateBackgroundColor() {
+                String text = bgColorTxt.getText();
+                if (isValidHexColor(text)) {
+                    Color color = Color.decode(text);
+                    bgColor.setBackground(color);
+                    backgroundColor = color;
+                }
+            }
+
+            private boolean isValidHexColor(String hex) {
+                if (hex.matches("^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$")) {
+                    return true;
+                }
+                return false;
+            }
+        });
+    }
+
+    private String[] savedData = {}; // Array to store lines from JTextArea
+
+    public String[] getSavedData() {
+        return savedData;
+    }
+
+    public void setSavedData(String[] savedData) {
+        this.savedData = savedData;
+    }
+
+    public void setRenameCount() {
+        renameCount.setText(", and found " + this.savedData.length + " line to Rename");
+    }
+
+    // Method to open the RenameWindow
+    private void openSupportingWindow() {
+        RenameTexts renameWindow = new RenameTexts(this);
+        renameWindow.setLocationRelativeTo(null);
+        renameWindow.setVisible(true); // Show the rename window
     }
 
     private void optionEnable(String option) {
@@ -232,8 +324,19 @@ public class Main extends javax.swing.JFrame {
                             String selectedFormat = (String) outputFormat.getSelectedItem();
 
                             // Create the output file with the desired extension
+                            String newFileName; // Variable to hold the new file name
+
                             String originalFileName = imageFile.getName();
-                            String newFileName = originalFileName.substring(0, originalFileName.lastIndexOf('.')) + "." + selectedFormat.toLowerCase();
+
+                            // Check if 'i' is a valid index and 'savedData' has elements
+                            if (i >= 0 && i < savedData.length && savedData[i] != null && !savedData[i].isEmpty()) {
+                                // If savedData[i] exists, use it as the new file name
+                                newFileName = savedData[i] + "." + selectedFormat.toLowerCase();
+                            } else {
+                                // Otherwise, use the original file name without extension
+                                newFileName = originalFileName.substring(0, originalFileName.lastIndexOf('.')) + "." + selectedFormat.toLowerCase();
+                            }
+
                             File outputFile = new File(compressedDir, newFileName);
 
                             // Compress the image with the specified quality and format
@@ -254,8 +357,19 @@ public class Main extends javax.swing.JFrame {
                             String selectedFormat = (String) outputFormat.getSelectedItem();
 
                             // Create the output file with the desired extension
+                            // Create the output file with the desired extension
+                            String newFileName; // Variable to hold the new file name
+
                             String originalFileName = imageFile.getName();
-                            String newFileName = originalFileName.substring(0, originalFileName.lastIndexOf('.')) + "." + selectedFormat.toLowerCase();
+                            // Check if 'i' is a valid index and 'savedData' has elements
+                            if (i >= 0 && i < savedData.length && savedData[i] != null && !savedData[i].isEmpty()) {
+                                // If savedData[i] exists, use it as the new file name
+                                newFileName = savedData[i] + "." + selectedFormat.toLowerCase();
+                            } else {
+                                // Otherwise, use the original file name without extension
+                                newFileName = originalFileName.substring(0, originalFileName.lastIndexOf('.')) + "." + selectedFormat.toLowerCase();
+                            }
+
                             File outputFile = new File(compressedDir, newFileName);
 
                             // Compress the image with the specified quality and format
@@ -277,10 +391,19 @@ public class Main extends javax.swing.JFrame {
                             String selectedFormat = (String) outputFormat.getSelectedItem();
 
                             // Create the output file with the desired extension
+                            // Create the output file with the desired extension
+                            String newFileName; // Variable to hold the new file name
                             String originalFileName = imageFile.getName();
-                            String newFileName = originalFileName.substring(0, originalFileName.lastIndexOf('.')) + "." + selectedFormat.toLowerCase();
-                            File outputFile = new File(compressedDir, newFileName);
+                            // Check if 'i' is a valid index and 'savedData' has elements
+                            if (i >= 0 && i < savedData.length && savedData[i] != null && !savedData[i].isEmpty()) {
+                                // If savedData[i] exists, use it as the new file name
+                                newFileName = savedData[i] + "." + selectedFormat.toLowerCase();
+                            } else {
+                                // Otherwise, use the original file name without extension
+                                newFileName = originalFileName.substring(0, originalFileName.lastIndexOf('.')) + "." + selectedFormat.toLowerCase();
+                            }
 
+                            File outputFile = new File(compressedDir, newFileName);
                             // Compress the image with the specified quality and format
                             resizeByDimension(image, outputFile, width, height, selectedFormat);
                         } catch (Exception ex) {
@@ -349,7 +472,7 @@ public class Main extends javax.swing.JFrame {
         return enhancedImage;
     }
 
-    private BufferedImage preModify(BufferedImage image) {
+    private BufferedImage preModify(BufferedImage image, String OutputFormat) {
         // Get values from sliders or input fields
         float sharpFactor = sharp.getValue();
         float enhancementFactor = bright.getValue();
@@ -385,13 +508,22 @@ public class Main extends javax.swing.JFrame {
             image = imageWithBackground; // Use the new image with background
         }
 
+        // Convert to RGB if the selected format is JPG
+        if ("jpg".equalsIgnoreCase(OutputFormat)) {
+            BufferedImage rgbImage = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
+            Graphics g = rgbImage.getGraphics();
+            g.drawImage(image, 0, 0, null);
+            g.dispose();
+            image = rgbImage; // Use the RGB image for further processing
+        }
+
         return image;
     }
 
     public void resizeByDimension(BufferedImage image, File outputFile, int width, int height, String selectedFormat) throws IOException {
         // Create a resized version of the original image
 
-        BufferedImage originalImage = preModify(image);
+        BufferedImage originalImage = preModify(image, selectedFormat);
 
         BufferedImage resizedImage = new BufferedImage(width, height, originalImage.getType());
         Graphics2D g2d = resizedImage.createGraphics();
@@ -438,19 +570,9 @@ public class Main extends javax.swing.JFrame {
     // Updated compressByQuality method
     public void compressByQuality(BufferedImage originalImage, File outputFile, float quality, String selectedFormat) throws IOException {
         // Enhance the color of the original image
-        BufferedImage enhancedImage = preModify(originalImage);
+        BufferedImage enhancedImage = preModify(originalImage, selectedFormat);
 
         // Check if the format is JPG or WEBP and handle the background color for PNG
-        // Convert to RGB if the selected format is JPG
-        
-        if ("jpg".equalsIgnoreCase(selectedFormat)) {
-            BufferedImage rgbImage = new BufferedImage(enhancedImage.getWidth(), enhancedImage.getHeight(), BufferedImage.TYPE_INT_RGB);
-            Graphics g = rgbImage.getGraphics();
-            g.drawImage(enhancedImage, 0, 0, null);
-            g.dispose();
-            enhancedImage = rgbImage; // Use the RGB image for further processing
-        }
-        
         // Get an ImageWriter for the desired output format (e.g., JPG, PNG, WEBP)
         ImageWriter imageWriter = null;
         ImageWriteParam imageWriteParam = null;
@@ -507,7 +629,7 @@ public class Main extends javax.swing.JFrame {
         float quality = 1.0f; // Start with the highest quality
         File tempFile = null;
 
-        BufferedImage enhancedImage = preModify(originalImage);
+        BufferedImage enhancedImage = preModify(originalImage, formatName);
 
         // Loop until the compressed image is below or equal to maxSizeKB
         do {
@@ -620,6 +742,7 @@ public class Main extends javax.swing.JFrame {
                 });
 
                 int imageCount = (imageFiles != null) ? imageFiles.length : 0;
+                TotalImageCount = imageCount;
                 browseSelectionInfo.setText("You chose a directory that contains " + imageCount + " image(s).");
             } else {
                 browseSelectionInfo.setText("You chose a file.");
@@ -770,6 +893,7 @@ public class Main extends javax.swing.JFrame {
     private void initComponents() {
 
         compressOptionsGroup = new javax.swing.ButtonGroup();
+        jTabbedPane1 = new javax.swing.JTabbedPane();
         TopPanel = new javax.swing.JPanel();
         jSeparator1 = new javax.swing.JSeparator();
         jSeparator2 = new javax.swing.JSeparator();
@@ -778,6 +902,8 @@ public class Main extends javax.swing.JFrame {
         browseSelectionInfo = new javax.swing.JLabel();
         jPanel1 = new javax.swing.JPanel();
         path = new javax.swing.JLabel();
+        jLabel5 = new javax.swing.JLabel();
+        renameCount = new javax.swing.JLabel();
         MainCenterPanel = new javax.swing.JPanel();
         byOption = new javax.swing.JPanel();
         jPanel6 = new javax.swing.JPanel();
@@ -836,6 +962,9 @@ public class Main extends javax.swing.JFrame {
         sizeLbl2 = new javax.swing.JLabel();
         jPanel16 = new javax.swing.JPanel();
         outputFormat = new javax.swing.JComboBox<>();
+        bgColor = new javax.swing.JButton();
+        bgColorTxt = new javax.swing.JTextField();
+        jLabel6 = new javax.swing.JLabel();
         GenerateProgress = new javax.swing.JPanel();
         jPanel17 = new javax.swing.JPanel();
         jPanel26 = new javax.swing.JPanel();
@@ -880,17 +1009,29 @@ public class Main extends javax.swing.JFrame {
             .addComponent(path, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
         );
 
+        jLabel5.setForeground(new java.awt.Color(0, 153, 153));
+        jLabel5.setText("Rename");
+
+        renameCount.setForeground(new java.awt.Color(153, 153, 153));
+        renameCount.setText(", and add data to rename");
+
         javax.swing.GroupLayout browseAreaLayout = new javax.swing.GroupLayout(browseArea);
         browseArea.setLayout(browseAreaLayout);
         browseAreaLayout.setHorizontalGroup(
             browseAreaLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(browseAreaLayout.createSequentialGroup()
                 .addGap(15, 15, 15)
-                .addComponent(btnBrowse)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addGroup(browseAreaLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(browseSelectionInfo, javax.swing.GroupLayout.PREFERRED_SIZE, 302, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addGroup(browseAreaLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                    .addGroup(browseAreaLayout.createSequentialGroup()
+                        .addComponent(btnBrowse)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, browseAreaLayout.createSequentialGroup()
+                        .addComponent(browseSelectionInfo)
+                        .addGap(0, 0, 0)
+                        .addComponent(renameCount)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addComponent(jLabel5)))
                 .addContainerGap(15, Short.MAX_VALUE))
         );
         browseAreaLayout.setVerticalGroup(
@@ -901,7 +1042,10 @@ public class Main extends javax.swing.JFrame {
                     .addComponent(btnBrowse, javax.swing.GroupLayout.DEFAULT_SIZE, 28, Short.MAX_VALUE)
                     .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(browseSelectionInfo)
+                .addGroup(browseAreaLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(browseSelectionInfo)
+                    .addComponent(jLabel5)
+                    .addComponent(renameCount))
                 .addContainerGap(7, Short.MAX_VALUE))
         );
 
@@ -913,18 +1057,20 @@ public class Main extends javax.swing.JFrame {
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addComponent(jSeparator1))
             .addGroup(TopPanelLayout.createSequentialGroup()
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addGroup(TopPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jSeparator2, javax.swing.GroupLayout.PREFERRED_SIZE, 616, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(browseArea, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addContainerGap(32, Short.MAX_VALUE)
+                .addComponent(jSeparator2, javax.swing.GroupLayout.PREFERRED_SIZE, 616, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(33, Short.MAX_VALUE))
+            .addGroup(TopPanelLayout.createSequentialGroup()
+                .addGap(72, 72, 72)
+                .addComponent(browseArea, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         TopPanelLayout.setVerticalGroup(
             TopPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(TopPanelLayout.createSequentialGroup()
-                .addGap(37, 37, 37)
+                .addGap(31, 31, 31)
                 .addComponent(browseArea, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addGap(18, 18, 18)
                 .addComponent(jSeparator2, javax.swing.GroupLayout.PREFERRED_SIZE, 11, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(33, 33, 33)
                 .addComponent(jSeparator1, javax.swing.GroupLayout.PREFERRED_SIZE, 10, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -980,7 +1126,7 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(compressBySize)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(compressByDim)
-                .addContainerGap(315, Short.MAX_VALUE))
+                .addContainerGap(302, Short.MAX_VALUE))
         );
         jPanel7Layout.setVerticalGroup(
             jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1035,7 +1181,7 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(maxSize, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jLabel2)
-                .addContainerGap(448, Short.MAX_VALUE))
+                .addContainerGap(435, Short.MAX_VALUE))
         );
         jPanel12Layout.setVerticalGroup(
             jPanel12Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1098,7 +1244,7 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(dimH, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jLabel3)
-                .addContainerGap(361, Short.MAX_VALUE))
+                .addContainerGap(348, Short.MAX_VALUE))
         );
         jPanel19Layout.setVerticalGroup(
             jPanel19Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1126,7 +1272,7 @@ public class Main extends javax.swing.JFrame {
         jPanel22Layout.setHorizontalGroup(
             jPanel22Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel22Layout.createSequentialGroup()
-                .addContainerGap(91, Short.MAX_VALUE)
+                .addContainerGap(88, Short.MAX_VALUE)
                 .addComponent(CompressBylbl4)
                 .addGap(25, 25, 25))
         );
@@ -1141,10 +1287,10 @@ public class Main extends javax.swing.JFrame {
         PercentageCompression.add(jPanel22);
 
         percentage.setToolTipText("");
-        percentage.setValue(80);
+        percentage.setValue(90);
 
         percentageLbl.setForeground(new java.awt.Color(51, 51, 51));
-        percentageLbl.setText("80%");
+        percentageLbl.setText("90%");
         percentageLbl.setToolTipText("");
 
         javax.swing.GroupLayout jPanel23Layout = new javax.swing.GroupLayout(jPanel23);
@@ -1156,7 +1302,7 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(percentage, javax.swing.GroupLayout.PREFERRED_SIZE, 256, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(18, 18, 18)
                 .addComponent(percentageLbl, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(233, Short.MAX_VALUE))
+                .addContainerGap(223, Short.MAX_VALUE))
         );
         jPanel23Layout.setVerticalGroup(
             jPanel23Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1195,7 +1341,7 @@ public class Main extends javax.swing.JFrame {
             .addGroup(jPanel25Layout.createSequentialGroup()
                 .addGap(15, 15, 15)
                 .addComponent(jSeparator3, javax.swing.GroupLayout.PREFERRED_SIZE, 335, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(192, Short.MAX_VALUE))
+                .addContainerGap(179, Short.MAX_VALUE))
         );
         jPanel25Layout.setVerticalGroup(
             jPanel25Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1211,7 +1357,7 @@ public class Main extends javax.swing.JFrame {
         MainCenterPanel.setLayout(MainCenterPanelLayout);
         MainCenterPanelLayout.setHorizontalGroup(
             MainCenterPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(byOption, javax.swing.GroupLayout.DEFAULT_SIZE, 694, Short.MAX_VALUE)
+            .addComponent(byOption, javax.swing.GroupLayout.DEFAULT_SIZE, 681, Short.MAX_VALUE)
             .addComponent(SizeCompression, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
             .addComponent(DimCompression, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
             .addComponent(seper, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
@@ -1249,7 +1395,7 @@ public class Main extends javax.swing.JFrame {
         jPanel29Layout.setHorizontalGroup(
             jPanel29Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel29Layout.createSequentialGroup()
-                .addContainerGap(72, Short.MAX_VALUE)
+                .addContainerGap(71, Short.MAX_VALUE)
                 .addComponent(sizeLbl3)
                 .addGap(25, 25, 25))
         );
@@ -1290,7 +1436,7 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(brightLbl, javax.swing.GroupLayout.PREFERRED_SIZE, 39, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(resetBright, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(234, Short.MAX_VALUE))
+                .addContainerGap(222, Short.MAX_VALUE))
         );
         jPanel30Layout.setVerticalGroup(
             jPanel30Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1357,7 +1503,7 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(sharpLbl, javax.swing.GroupLayout.PREFERRED_SIZE, 39, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(resetSharp, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(235, Short.MAX_VALUE))
+                .addContainerGap(222, Short.MAX_VALUE))
         );
         jPanel34Layout.setVerticalGroup(
             jPanel34Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1414,7 +1560,7 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(outputDir, javax.swing.GroupLayout.PREFERRED_SIZE, 108, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(5, 5, 5)
                 .addComponent(jLabel4)
-                .addContainerGap(265, Short.MAX_VALUE))
+                .addContainerGap(252, Short.MAX_VALUE))
         );
         jPanel14Layout.setVerticalGroup(
             jPanel14Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1439,7 +1585,7 @@ public class Main extends javax.swing.JFrame {
         jPanel15Layout.setHorizontalGroup(
             jPanel15Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel15Layout.createSequentialGroup()
-                .addContainerGap(47, Short.MAX_VALUE)
+                .addContainerGap(41, Short.MAX_VALUE)
                 .addComponent(sizeLbl2)
                 .addGap(25, 25, 25))
         );
@@ -1460,6 +1606,19 @@ public class Main extends javax.swing.JFrame {
             }
         });
 
+        bgColor.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                bgColorActionPerformed(evt);
+            }
+        });
+
+        bgColorTxt.setText("#f9f9f9");
+        bgColorTxt.setPreferredSize(new java.awt.Dimension(64, 26));
+
+        jLabel6.setFont(new java.awt.Font("Segoe UI", 0, 11)); // NOI18N
+        jLabel6.setForeground(new java.awt.Color(153, 153, 153));
+        jLabel6.setText("Output png* images Background");
+
         javax.swing.GroupLayout jPanel16Layout = new javax.swing.GroupLayout(jPanel16);
         jPanel16.setLayout(jPanel16Layout);
         jPanel16Layout.setHorizontalGroup(
@@ -1467,13 +1626,22 @@ public class Main extends javax.swing.JFrame {
             .addGroup(jPanel16Layout.createSequentialGroup()
                 .addGap(5, 5, 5)
                 .addComponent(outputFormat, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(453, Short.MAX_VALUE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(bgColor, javax.swing.GroupLayout.PREFERRED_SIZE, 26, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 0, 0)
+                .addComponent(bgColorTxt, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(jLabel6)
+                .addContainerGap(173, Short.MAX_VALUE))
         );
         jPanel16Layout.setVerticalGroup(
             jPanel16Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel16Layout.createSequentialGroup()
-                .addGap(0, 0, 0)
-                .addComponent(outputFormat, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel16Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                .addComponent(outputFormat, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(bgColor, javax.swing.GroupLayout.PREFERRED_SIZE, 26, javax.swing.GroupLayout.PREFERRED_SIZE))
+            .addGroup(jPanel16Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                .addComponent(bgColorTxt, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(jLabel6))
         );
 
         outputFormatPanel.add(jPanel16);
@@ -1509,7 +1677,7 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(generateProgress, javax.swing.GroupLayout.PREFERRED_SIZE, 314, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(18, 18, 18)
                 .addComponent(openDirLbl)
-                .addContainerGap(124, Short.MAX_VALUE))
+                .addContainerGap(110, Short.MAX_VALUE))
         );
         jPanel26Layout.setVerticalGroup(
             jPanel26Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1552,7 +1720,7 @@ public class Main extends javax.swing.JFrame {
             .addGroup(jPanel28Layout.createSequentialGroup()
                 .addGap(0, 0, 0)
                 .addComponent(generateImage)
-                .addContainerGap(423, Short.MAX_VALUE))
+                .addContainerGap(410, Short.MAX_VALUE))
         );
         jPanel28Layout.setVerticalGroup(
             jPanel28Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1570,16 +1738,16 @@ public class Main extends javax.swing.JFrame {
             .addGroup(bottomPanelLayout.createSequentialGroup()
                 .addContainerGap()
                 .addGroup(bottomPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(brightnessPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(outputDirPanel, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 682, Short.MAX_VALUE)
-                    .addComponent(outputFormatPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(GenerateProgress, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(outputFormatPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                    .addComponent(brightnessPanel, javax.swing.GroupLayout.DEFAULT_SIZE, 669, Short.MAX_VALUE)
+                    .addComponent(outputDirPanel, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 669, Short.MAX_VALUE)
+                    .addComponent(outputFormatPanel, javax.swing.GroupLayout.DEFAULT_SIZE, 669, Short.MAX_VALUE)
+                    .addComponent(GenerateProgress, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 669, Short.MAX_VALUE)
+                    .addComponent(outputFormatPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, 669, Short.MAX_VALUE))
                 .addContainerGap())
             .addGroup(bottomPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                 .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, bottomPanelLayout.createSequentialGroup()
                     .addContainerGap()
-                    .addComponent(SharpnessPanel, javax.swing.GroupLayout.DEFAULT_SIZE, 682, Short.MAX_VALUE)
+                    .addComponent(SharpnessPanel, javax.swing.GroupLayout.DEFAULT_SIZE, 669, Short.MAX_VALUE)
                     .addContainerGap()))
         );
         bottomPanelLayout.setVerticalGroup(
@@ -1624,6 +1792,23 @@ public class Main extends javax.swing.JFrame {
         sharpLbl.setText("100%");
     }//GEN-LAST:event_resetSharpMouseClicked
 
+    private void bgColorActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_bgColorActionPerformed
+        // TODO add your handling code here:
+        Color selectedColor = JColorChooser.showDialog(this, "Choose a Color", backgroundColor);
+        if (selectedColor != null) {
+            bgColor.setBackground(selectedColor);
+            backgroundColor = selectedColor;
+
+            // Convert the selected color to hex format
+            String hexColor = String.format("#%02X%02X%02X",
+                    selectedColor.getRed(),
+                    selectedColor.getGreen(),
+                    selectedColor.getBlue());
+
+            bgColorTxt.setText(hexColor); // Set the hex value to the text field
+        }
+    }//GEN-LAST:event_bgColorActionPerformed
+
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JLabel CompressBylbl;
@@ -1635,6 +1820,8 @@ public class Main extends javax.swing.JFrame {
     private javax.swing.JPanel SharpnessPanel;
     private javax.swing.JPanel SizeCompression;
     private javax.swing.JPanel TopPanel;
+    private javax.swing.JButton bgColor;
+    private javax.swing.JTextField bgColorTxt;
     private javax.swing.JPanel bottomPanel;
     private javax.swing.JSlider bright;
     private javax.swing.JLabel brightLbl;
@@ -1655,6 +1842,8 @@ public class Main extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
+    private javax.swing.JLabel jLabel5;
+    private javax.swing.JLabel jLabel6;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel11;
     private javax.swing.JPanel jPanel12;
@@ -1681,6 +1870,7 @@ public class Main extends javax.swing.JFrame {
     private javax.swing.JSeparator jSeparator1;
     private javax.swing.JSeparator jSeparator2;
     private javax.swing.JSeparator jSeparator3;
+    private javax.swing.JTabbedPane jTabbedPane1;
     private javax.swing.JTextField maxSize;
     private javax.swing.JLabel openDirLbl;
     private javax.swing.JTextField outputDir;
@@ -1691,6 +1881,7 @@ public class Main extends javax.swing.JFrame {
     private javax.swing.JLabel path;
     private javax.swing.JSlider percentage;
     private javax.swing.JLabel percentageLbl;
+    private javax.swing.JLabel renameCount;
     private javax.swing.JLabel resetBright;
     private javax.swing.JLabel resetSharp;
     private javax.swing.JPanel seper;
