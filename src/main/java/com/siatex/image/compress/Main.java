@@ -5,14 +5,12 @@ import com.formdev.flatlaf.FlatLaf;
 
 import com.formdev.flatlaf.themes.FlatMacLightLaf;
 import com.luciad.imageio.webp.WebPWriteParam;
-import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.FileDialog;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.Insets;
 import java.awt.RenderingHints;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
@@ -34,9 +32,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
@@ -44,13 +40,8 @@ import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
-import javax.swing.JButton;
 import javax.swing.JColorChooser;
-import javax.swing.JFrame;
 import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
 import javax.swing.SwingWorker;
 import javax.swing.Timer;
 import javax.swing.border.Border;
@@ -66,7 +57,7 @@ import javax.swing.event.DocumentListener;
 public class Main extends javax.swing.JFrame {
 
     // Define supported image extensions as a static final array
-    private Color backgroundColor = Color.decode("#f9f9f9");
+    private Color backgroundColor = Color.decode("#d0d0d0");
 
     private static final String[] IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"};
     private List<ImageIcon> generateIcons;
@@ -77,6 +68,14 @@ public class Main extends javax.swing.JFrame {
         WindowIconSetter.setIcon(this);
         initComponents();
         bgColor.setBackground(backgroundColor);
+        // Convert the selected color to hex format
+        String hexColor = String.format("#%02X%02X%02X",
+                backgroundColor.getRed(),
+                backgroundColor.getGreen(),
+                backgroundColor.getBlue());
+
+        bgColorTxt.setText(hexColor);
+
         generateProgress.setVisible(false);
         openDirLbl.setVisible(false);
         generateIcons = new ArrayList<>();
@@ -228,6 +227,10 @@ public class Main extends javax.swing.JFrame {
         return savedData;
     }
 
+    public void clearData() {
+        savedData = new String[0]; // Reinitialize the array to be empty
+    }
+
     public void setSavedData(String[] savedData) {
         this.savedData = savedData;
     }
@@ -284,10 +287,13 @@ public class Main extends javax.swing.JFrame {
         String selectedPath = path.getText();
         File directory = new File(selectedPath);
         File[] imageFiles = directory.listFiles((dir, name) -> {
-            String lowerCaseName = name.toLowerCase();
-            for (String extension : IMAGE_EXTENSIONS) {
-                if (lowerCaseName.endsWith(extension)) {
-                    return true;
+            File file = new File(dir, name);
+            if (file.isFile()) { // Check if it is a file, not a directory
+                String lowerCaseName = name.toLowerCase();
+                for (String extension : IMAGE_EXTENSIONS) {
+                    if (lowerCaseName.endsWith(extension)) {
+                        return true;
+                    }
                 }
             }
             return false;
@@ -426,6 +432,7 @@ public class Main extends javax.swing.JFrame {
             @Override
             protected void done() {
                 browseSelectionInfo.setText("Compression completed!");
+                clearData();
                 openDirLbl.setEnabled(true);
                 stopAnimation(); // Stop the icon animation when done
             }
@@ -732,10 +739,13 @@ public class Main extends javax.swing.JFrame {
             File directory = new File(selectedDirectory);
             if (directory.isDirectory()) {
                 File[] imageFiles = directory.listFiles((dir, name) -> {
-                    String lowerCaseName = name.toLowerCase();
-                    for (String extension : IMAGE_EXTENSIONS) {
-                        if (lowerCaseName.endsWith(extension)) {
-                            return true;
+                    File file = new File(dir, name);
+                    if (file.isFile()) { // Check if it is a file, not a directory
+                        String lowerCaseName = name.toLowerCase();
+                        for (String extension : IMAGE_EXTENSIONS) {
+                            if (lowerCaseName.endsWith(extension)) {
+                                return true;
+                            }
                         }
                     }
                     return false;
@@ -1585,7 +1595,7 @@ public class Main extends javax.swing.JFrame {
         jPanel15Layout.setHorizontalGroup(
             jPanel15Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel15Layout.createSequentialGroup()
-                .addContainerGap(41, Short.MAX_VALUE)
+                .addContainerGap(48, Short.MAX_VALUE)
                 .addComponent(sizeLbl2)
                 .addGap(25, 25, 25))
         );
@@ -1629,10 +1639,10 @@ public class Main extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(bgColor, javax.swing.GroupLayout.PREFERRED_SIZE, 26, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(0, 0, 0)
-                .addComponent(bgColorTxt, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(bgColorTxt, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(jLabel6)
-                .addContainerGap(173, Short.MAX_VALUE))
+                .addContainerGap(154, Short.MAX_VALUE))
         );
         jPanel16Layout.setVerticalGroup(
             jPanel16Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
