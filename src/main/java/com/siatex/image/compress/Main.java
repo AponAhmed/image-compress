@@ -508,8 +508,17 @@ public class Main extends javax.swing.JFrame {
 
             // Fill the background
             Graphics2D g = imageWithBackground.createGraphics();
-            g.setColor(backgroundColor);
-            g.fillRect(0, 0, imageWithBackground.getWidth(), imageWithBackground.getHeight());
+            if (!noBg.isSelected()) {
+                g.setColor(backgroundColor);
+                g.fillRect(0, 0, imageWithBackground.getWidth(), imageWithBackground.getHeight());
+            }
+
+            String selectedFormat = (String) outputFormat.getSelectedItem();
+            if ("jpg".equalsIgnoreCase(selectedFormat)) {
+                g.setColor(Color.WHITE);
+                g.fillRect(0, 0, imageWithBackground.getWidth(), imageWithBackground.getHeight());
+            }
+
             g.drawImage(image, 0, 0, null);
             g.dispose();
             image = imageWithBackground; // Use the new image with background
@@ -975,6 +984,7 @@ public class Main extends javax.swing.JFrame {
         bgColor = new javax.swing.JButton();
         bgColorTxt = new javax.swing.JTextField();
         jLabel6 = new javax.swing.JLabel();
+        noBg = new javax.swing.JCheckBox();
         GenerateProgress = new javax.swing.JPanel();
         jPanel17 = new javax.swing.JPanel();
         jPanel26 = new javax.swing.JPanel();
@@ -1595,7 +1605,7 @@ public class Main extends javax.swing.JFrame {
         jPanel15Layout.setHorizontalGroup(
             jPanel15Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel15Layout.createSequentialGroup()
-                .addContainerGap(48, Short.MAX_VALUE)
+                .addContainerGap(47, Short.MAX_VALUE)
                 .addComponent(sizeLbl2)
                 .addGap(25, 25, 25))
         );
@@ -1629,6 +1639,8 @@ public class Main extends javax.swing.JFrame {
         jLabel6.setForeground(new java.awt.Color(153, 153, 153));
         jLabel6.setText("Output png* images Background");
 
+        noBg.setText("None");
+
         javax.swing.GroupLayout jPanel16Layout = new javax.swing.GroupLayout(jPanel16);
         jPanel16.setLayout(jPanel16Layout);
         jPanel16Layout.setHorizontalGroup(
@@ -1640,9 +1652,11 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(bgColor, javax.swing.GroupLayout.PREFERRED_SIZE, 26, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(0, 0, 0)
                 .addComponent(bgColorTxt, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addGap(18, 18, 18)
+                .addComponent(noBg)
+                .addGap(26, 26, 26)
                 .addComponent(jLabel6)
-                .addContainerGap(154, Short.MAX_VALUE))
+                .addContainerGap(71, Short.MAX_VALUE))
         );
         jPanel16Layout.setVerticalGroup(
             jPanel16Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1651,7 +1665,8 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(bgColor, javax.swing.GroupLayout.PREFERRED_SIZE, 26, javax.swing.GroupLayout.PREFERRED_SIZE))
             .addGroup(jPanel16Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                 .addComponent(bgColorTxt, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addComponent(jLabel6))
+                .addComponent(jLabel6)
+                .addComponent(noBg))
         );
 
         outputFormatPanel.add(jPanel16);
@@ -1882,6 +1897,7 @@ public class Main extends javax.swing.JFrame {
     private javax.swing.JSeparator jSeparator3;
     private javax.swing.JTabbedPane jTabbedPane1;
     private javax.swing.JTextField maxSize;
+    private javax.swing.JCheckBox noBg;
     private javax.swing.JLabel openDirLbl;
     private javax.swing.JTextField outputDir;
     private javax.swing.JPanel outputDirPanel;

@@ -105,29 +105,44 @@ public class RenameTexts extends javax.swing.JFrame {
 
     private void FilterBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_FilterBtnActionPerformed
         String[] lines = textArea.getText().split("\\n");
-        Set<String> uniqueLines = new LinkedHashSet<>(); // Maintain order and uniqueness
-
-        for (String line : lines) {
-            uniqueLines.add(line.trim()); // Optionally, trim the lines to avoid "duplicate" entries with extra spaces
-        }
+        Set<String> uniqueLines = processLines(lines);
 
         // Update the JTextArea with filtered unique lines
-        StringBuilder filteredText = new StringBuilder();
-        for (String line : uniqueLines) {
-            filteredText.append(line).append("\n");
-        }
-        textArea.setText(filteredText.toString());
+        textArea.setText(String.join("\n", uniqueLines));
     }//GEN-LAST:event_FilterBtnActionPerformed
 
     private void applyBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_applyBtnActionPerformed
+
+        String[] lines = textArea.getText().split("\\n");
+        Set<String> uniqueLines = processLines(lines);
+
+        // Update the JTextArea with filtered unique lines
+        textArea.setText(String.join("\n", uniqueLines));
+
         // Get lines from the JTextArea and store them in the main app's savedData array
         this.App.setSavedData(textArea.getText().split("\\n"));
-
         this.App.setRenameCount();
+
         // Close the supporting window
         this.dispose();
     }//GEN-LAST:event_applyBtnActionPerformed
 
+    private Set<String> processLines(String[] lines) {
+        Set<String> uniqueLines = new LinkedHashSet<>(); // Maintain order and uniqueness
+
+        for (String line : lines) {
+            // Remove extra spaces, trim leading/trailing spaces, and normalize spaces
+            String filteredLine = line.trim().replaceAll("\\s+", " ");
+
+            // Replace "T-Shirts" or "T-Shirt" with "T-shirts" or "T-shirt"
+            filteredLine = filteredLine.replaceAll("(?i)T-Shirts", "T-shirts")
+                    .replaceAll("(?i)T-Shirt", "T-shirt");
+
+            uniqueLines.add(filteredLine);
+        }
+
+        return uniqueLines;
+    }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton FilterBtn;
