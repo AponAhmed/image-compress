@@ -42,6 +42,7 @@ import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JColorChooser;
 import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.Timer;
 import javax.swing.border.Border;
@@ -63,10 +64,12 @@ public class Main extends javax.swing.JFrame {
     private List<ImageIcon> generateIcons;
     private Timer animationTimer;
     private int TotalImageCount;
+    private logViewer logViewerWindow;
 
     public Main() {
         WindowIconSetter.setIcon(this);
         initComponents();
+        logPanel.setVisible(false);
         bgColor.setBackground(backgroundColor);
         // Convert the selected color to hex format
         String hexColor = String.format("#%02X%02X%02X",
@@ -89,6 +92,16 @@ public class Main extends javax.swing.JFrame {
         compressOptionsGroup.add(compressByPercentage);
         compressOptionsGroup.add(compressBySize);
         compressOptionsGroup.add(compressByDim);
+
+        // Add this wherever you initialize your logDisplay button (in eventInit() or constructor)
+        logDisplay.addActionListener(e -> {
+            if (logViewerWindow == null) {
+                logViewerWindow = new logViewer();
+                logViewerWindow.setLocationRelativeTo(this);
+            }
+            logViewerWindow.setVisible(true);
+            logViewerWindow.toFront();
+        });
 
         eventInit();
         optionEnable("percentage");
@@ -239,6 +252,22 @@ public class Main extends javax.swing.JFrame {
         renameCount.setText(", and found " + this.savedData.length + " line to Rename");
     }
 
+    private void updateCurrentLogLine(String line) {
+        SwingUtilities.invokeLater(() -> {
+            if (line == null || line.isBlank()) {
+                return;
+            }
+            String display = line.length() > 90 ? line.substring(0, 87) + "..." : line;
+            CurrentLogLine.setText(display);
+        });
+    }
+
+    private void logLine(java.io.PrintWriter logger, String line) {
+        logger.println(line);
+        logger.flush();
+        updateCurrentLogLine(line.trim());
+    }
+
     // Method to open the RenameWindow
     private void openSupportingWindow() {
         RenameTexts renameWindow = new RenameTexts(this);
@@ -288,7 +317,7 @@ public class Main extends javax.swing.JFrame {
         File directory = new File(selectedPath);
         File[] imageFiles = directory.listFiles((dir, name) -> {
             File file = new File(dir, name);
-            if (file.isFile()) { // Check if it is a file, not a directory
+            if (file.isFile()) {
                 String lowerCaseName = name.toLowerCase();
                 for (String extension : IMAGE_EXTENSIONS) {
                     if (lowerCaseName.endsWith(extension)) {
@@ -311,79 +340,58 @@ public class Main extends javax.swing.JFrame {
 
         generateProgress.setMaximum(imageFiles.length);
         generateProgress.setValue(0);
-        startAnimation(); // Start the icon animation
+        startAnimation();
         generateProgress.setVisible(true);
         openDirLbl.setVisible(true);
         openDirLbl.setEnabled(false);
-        // Use SwingWorker to handle the compression on a background thread
+        CurrentLogLine.setText("");
+        logPanel.setVisible(true);
+        logDisplay.setEnabled(true);
+
         SwingWorker<Void, Integer> worker = new SwingWorker<Void, Integer>() {
             @Override
             protected Void doInBackground() throws Exception {
                 if (compressByPercentage.isSelected()) {
-                    float qualityValue = percentage.getValue() / 100.0f; // Convert slider value to quality (0.0 - 1.0)
+                    float qualityValue = percentage.getValue() / 100.0f;
                     for (int i = 0; i < imageFiles.length; i++) {
                         File imageFile = imageFiles[i];
                         try {
-                            // Read the image
                             BufferedImage image = ImageIO.read(imageFile);
-                            // Get the selected format from the JComboBox
                             String selectedFormat = (String) outputFormat.getSelectedItem();
-
-                            // Create the output file with the desired extension
-                            String newFileName; // Variable to hold the new file name
-
                             String originalFileName = imageFile.getName();
-
-                            // Check if 'i' is a valid index and 'savedData' has elements
+                            String newFileName;
                             if (i >= 0 && i < savedData.length && savedData[i] != null && !savedData[i].isEmpty()) {
-                                // If savedData[i] exists, use it as the new file name
                                 newFileName = savedData[i] + "." + selectedFormat.toLowerCase();
                             } else {
-                                // Otherwise, use the original file name without extension
                                 newFileName = originalFileName.substring(0, originalFileName.lastIndexOf('.')) + "." + selectedFormat.toLowerCase();
                             }
-
                             File outputFile = new File(compressedDir, newFileName);
-
-                            // Compress the image with the specified quality and format
                             compressByQuality(image, outputFile, qualityValue, selectedFormat);
                         } catch (Exception ex) {
                             ex.printStackTrace();
                         }
-                        publish(i + 1); // Update progress
+                        publish(i + 1);
                     }
                 } else if (compressBySize.isSelected()) {
                     long maxSizeKB = Long.parseLong(maxSize.getText());
                     for (int i = 0; i < imageFiles.length; i++) {
                         File imageFile = imageFiles[i];
                         try {
-                            // Read the image
                             BufferedImage image = ImageIO.read(imageFile);
-                            // Get the selected format from the JComboBox
                             String selectedFormat = (String) outputFormat.getSelectedItem();
-
-                            // Create the output file with the desired extension
-                            // Create the output file with the desired extension
-                            String newFileName; // Variable to hold the new file name
-
                             String originalFileName = imageFile.getName();
-                            // Check if 'i' is a valid index and 'savedData' has elements
+                            String newFileName;
                             if (i >= 0 && i < savedData.length && savedData[i] != null && !savedData[i].isEmpty()) {
-                                // If savedData[i] exists, use it as the new file name
                                 newFileName = savedData[i] + "." + selectedFormat.toLowerCase();
                             } else {
-                                // Otherwise, use the original file name without extension
                                 newFileName = originalFileName.substring(0, originalFileName.lastIndexOf('.')) + "." + selectedFormat.toLowerCase();
                             }
-
                             File outputFile = new File(compressedDir, newFileName);
-
-                            // Compress the image with the specified quality and format
                             compressToMaxSize(image, outputFile, maxSizeKB, selectedFormat);
                         } catch (Exception ex) {
                             ex.printStackTrace();
                         }
-                        publish(i + 1); // Update progress
+                        publish(i + 1);
                     }
                 } else if (compressByDim.isSelected()) {
                     int width = Integer.parseInt(dimW.getText());
@@ -391,40 +399,28 @@ public class Main extends javax.swing.JFrame {
                     for (int i = 0; i < imageFiles.length; i++) {
                         File imageFile = imageFiles[i];
                         try {
-                            // Read the image
                             BufferedImage image = ImageIO.read(imageFile);
-                            // Get the selected format from the JComboBox
                             String selectedFormat = (String) outputFormat.getSelectedItem();
-
-                            // Create the output file with the desired extension
-                            // Create the output file with the desired extension
-                            String newFileName; // Variable to hold the new file name
                             String originalFileName = imageFile.getName();
-                            // Check if 'i' is a valid index and 'savedData' has elements
+                            String newFileName;
                             if (i >= 0 && i < savedData.length && savedData[i] != null && !savedData[i].isEmpty()) {
-                                // If savedData[i] exists, use it as the new file name
                                 newFileName = savedData[i] + "." + selectedFormat.toLowerCase();
                             } else {
-                                // Otherwise, use the original file name without extension
                                 newFileName = originalFileName.substring(0, originalFileName.lastIndexOf('.')) + "." + selectedFormat.toLowerCase();
                             }
-
                             File outputFile = new File(compressedDir, newFileName);
-                            // Compress the image with the specified quality and format
                             resizeByDimension(image, outputFile, width, height, selectedFormat);
                         } catch (Exception ex) {
                             ex.printStackTrace();
                         }
-                        publish(i + 1); // Update progress
+                        publish(i + 1);
                     }
-
                 }
                 return null;
             }
 
             @Override
             protected void process(java.util.List<Integer> chunks) {
-                // Update progress bar with the most recent value
                 int progress = chunks.get(chunks.size() - 1);
                 generateProgress.setValue(progress);
             }
@@ -434,7 +430,8 @@ public class Main extends javax.swing.JFrame {
                 browseSelectionInfo.setText("Compression completed!");
                 clearData();
                 openDirLbl.setEnabled(true);
-                stopAnimation(); // Stop the icon animation when done
+                stopAnimation();
+                logPanel.setVisible(false);
             }
         };
 
@@ -537,166 +534,326 @@ public class Main extends javax.swing.JFrame {
     }
 
     public void resizeByDimension(BufferedImage image, File outputFile, int width, int height, String selectedFormat) throws IOException {
-        // Create a resized version of the original image
+        java.io.PrintWriter logger = null;
+        try {
+            logger = new java.io.PrintWriter(new java.io.FileWriter("compress_log.txt", true));
 
-        BufferedImage originalImage = preModify(image, selectedFormat);
+            logLine(logger, "========================================");
+            logLine(logger, "[START] File: " + outputFile.getName());
+            logLine(logger, "  Mode       : Resize by Dimension");
+            logLine(logger, "  Format     : " + selectedFormat);
+            logLine(logger, "  Target     : " + width + "x" + height + " px");
+            logLine(logger, "  Image Size : " + image.getWidth() + "x" + image.getHeight());
+            logLine(logger, "  Timestamp  : " + new java.util.Date());
 
-        BufferedImage resizedImage = new BufferedImage(width, height, originalImage.getType());
-        Graphics2D g2d = resizedImage.createGraphics();
+            BufferedImage originalImage = preModify(image, selectedFormat);
 
-        //System.out.println("W-"+width+" H-"+height);
-        // Draw the original image into the resized image with the new dimensions
-        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g2d.drawImage(originalImage, 0, 0, width, height, null);
-        g2d.dispose();
+            BufferedImage resizedImage = new BufferedImage(width, height, originalImage.getType());
+            Graphics2D g2d = resizedImage.createGraphics();
+            g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g2d.drawImage(originalImage, 0, 0, width, height, null);
+            g2d.dispose();
 
-        // Configure the image writer and parameters based on the format
-        ImageWriter imageWriter = ImageIO.getImageWritersByFormatName(selectedFormat).next();
-        ImageWriteParam imageWriteParam = imageWriter.getDefaultWriteParam();
+            logLine(logger, "  Resizing " + image.getWidth() + "x" + image.getHeight()
+                    + " → " + width + "x" + height + " | writing...");
 
-        if ("jpg".equalsIgnoreCase(selectedFormat) || "jpeg".equalsIgnoreCase(selectedFormat)) {
-            // Set JPEG-specific parameters if needed
-            if (imageWriteParam.canWriteCompressed()) {
-                imageWriteParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-                imageWriteParam.setCompressionQuality(1.0f); // Max quality by default, adjust as needed
+            ImageWriter imageWriter = ImageIO.getImageWritersByFormatName(selectedFormat).next();
+            ImageWriteParam imageWriteParam = imageWriter.getDefaultWriteParam();
+
+            if ("jpg".equalsIgnoreCase(selectedFormat) || "jpeg".equalsIgnoreCase(selectedFormat)) {
+                if (imageWriteParam.canWriteCompressed()) {
+                    imageWriteParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+                    imageWriteParam.setCompressionQuality(1.0f);
+                }
+            } else if ("webp".equalsIgnoreCase(selectedFormat)) {
+                WebPWriteParam writeParam = new WebPWriteParam(imageWriter.getLocale());
+                writeParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+                String[] compressionTypes = writeParam.getCompressionTypes();
+                if (compressionTypes != null && compressionTypes.length > 0) {
+                    writeParam.setCompressionType(compressionTypes[WebPWriteParam.LOSSY_COMPRESSION]);
+                }
+                writeParam.setCompressionQuality(1.0f);
+                imageWriteParam = writeParam;
             }
-        } else if ("webp".equalsIgnoreCase(selectedFormat)) {
-            // Set WebP-specific parameters if needed
-            WebPWriteParam writeParam = new WebPWriteParam(imageWriter.getLocale());
-            writeParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
 
-            String[] compressionTypes = writeParam.getCompressionTypes();
-            if (compressionTypes != null && compressionTypes.length > 0) {
-                writeParam.setCompressionType(compressionTypes[WebPWriteParam.LOSSY_COMPRESSION]); // Use lossy compression
+            try (ImageOutputStream outputStream = ImageIO.createImageOutputStream(outputFile)) {
+                imageWriter.setOutput(outputStream);
+                imageWriter.write(null, new IIOImage(resizedImage, null, null), imageWriteParam);
+            } finally {
+                imageWriter.dispose();
             }
 
-            writeParam.setCompressionQuality(1.0f); // Max quality by default, adjust as needed
-            imageWriteParam = writeParam;
-        }
+            logLine(logger, "[DONE] " + outputFile.getName());
 
-        // Write the resized image to the output file
-        try (ImageOutputStream outputStream = ImageIO.createImageOutputStream(outputFile)) {
-            imageWriter.setOutput(outputStream);
-            imageWriter.write(null, new IIOImage(resizedImage, null, null), imageWriteParam);
+        } catch (Exception e) {
+            if (logger != null) {
+                logLine(logger, "[ERROR] Exception on file: " + outputFile.getName());
+                logLine(logger, "  Message: " + e.getMessage());
+                e.printStackTrace(logger);
+            }
+            throw e;
         } finally {
-            imageWriter.dispose();
+            if (logger != null) {
+                logger.close();
+            }
         }
     }
 
-    // Updated compressByQuality method
     public void compressByQuality(BufferedImage originalImage, File outputFile, float quality, String selectedFormat) throws IOException {
-        // Enhance the color of the original image
-        BufferedImage enhancedImage = preModify(originalImage, selectedFormat);
+        java.io.PrintWriter logger = null;
+        try {
+            logger = new java.io.PrintWriter(new java.io.FileWriter("compress_log.txt", true));
 
-        // Check if the format is JPG or WEBP and handle the background color for PNG
-        // Get an ImageWriter for the desired output format (e.g., JPG, PNG, WEBP)
-        ImageWriter imageWriter = null;
-        ImageWriteParam imageWriteParam = null;
+            logLine(logger, "========================================");
+            logLine(logger, "[START] File: " + outputFile.getName());
+            logLine(logger, "  Mode       : Compress by Quality");
+            logLine(logger, "  Format     : " + selectedFormat);
+            logLine(logger, "  Quality    : " + String.format("%.0f%%", quality * 100));
+            logLine(logger, "  Image Size : " + originalImage.getWidth() + "x" + originalImage.getHeight());
+            logLine(logger, "  Timestamp  : " + new java.util.Date());
 
-        // Select the appropriate writer based on the selected format
-        switch (selectedFormat.toLowerCase()) {
-            case "jpg":
-                imageWriter = ImageIO.getImageWritersByFormatName("jpg").next();
-                imageWriteParam = imageWriter.getDefaultWriteParam();
-                // Set the compression quality for JPEG
-                imageWriteParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-                imageWriteParam.setCompressionQuality(quality);
-                break;
-            case "png":
-                imageWriter = ImageIO.getImageWritersByFormatName("png").next();
-                imageWriteParam = imageWriter.getDefaultWriteParam();
-                // PNG uses lossless compression; control over compression levels is limited
-                if (imageWriteParam.canWriteCompressed()) {
+            BufferedImage enhancedImage = preModify(originalImage, selectedFormat);
+
+            ImageWriter imageWriter = null;
+            ImageWriteParam imageWriteParam = null;
+
+            switch (selectedFormat.toLowerCase()) {
+                case "jpg":
+                    imageWriter = ImageIO.getImageWritersByFormatName("jpg").next();
+                    imageWriteParam = imageWriter.getDefaultWriteParam();
                     imageWriteParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-                }
-                break;
-            case "webp":
-                imageWriter = ImageIO.getImageWritersByMIMEType("image/webp").next();
-                // Use WebPWriteParam for setting WebP-specific parameters
-                WebPWriteParam writeParam = new WebPWriteParam(imageWriter.getLocale());
-                // Set the compression mode and quality
-                writeParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-                // Choose between lossless and lossy compression
-                String[] compressionTypes = writeParam.getCompressionTypes();
-                if (compressionTypes != null && compressionTypes.length > 0) {
-                    writeParam.setCompressionType(compressionTypes[WebPWriteParam.LOSSY_COMPRESSION]); // or WebPWriteParam.LOSSY_COMPRESSION
-                }
-                // Set the compression quality
-                writeParam.setCompressionQuality(quality);
-                // Assign the writeParam for further usage
-                imageWriteParam = writeParam;
-                break;
-            default:
-                throw new IllegalArgumentException("Unsupported format: " + selectedFormat);
-        }
+                    imageWriteParam.setCompressionQuality(quality);
+                    break;
+                case "png":
+                    imageWriter = ImageIO.getImageWritersByFormatName("png").next();
+                    imageWriteParam = imageWriter.getDefaultWriteParam();
+                    if (imageWriteParam.canWriteCompressed()) {
+                        imageWriteParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+                    }
+                    break;
+                case "webp":
+                    imageWriter = ImageIO.getImageWritersByMIMEType("image/webp").next();
+                    WebPWriteParam writeParam = new WebPWriteParam(imageWriter.getLocale());
+                    writeParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+                    String[] compressionTypes = writeParam.getCompressionTypes();
+                    if (compressionTypes != null && compressionTypes.length > 0) {
+                        writeParam.setCompressionType(compressionTypes[WebPWriteParam.LOSSY_COMPRESSION]);
+                    }
+                    writeParam.setCompressionQuality(quality);
+                    imageWriteParam = writeParam;
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unsupported format: " + selectedFormat);
+            }
 
-        // Write the image with the specified quality
-        try (ImageOutputStream outputStream = ImageIO.createImageOutputStream(outputFile)) {
-            imageWriter.setOutput(outputStream);
-            imageWriter.write(null, new IIOImage(enhancedImage, null, null), imageWriteParam);
+            logLine(logger, "  Writing at quality=" + String.format("%.2f", quality) + "...");
+
+            try (ImageOutputStream outputStream = ImageIO.createImageOutputStream(outputFile)) {
+                imageWriter.setOutput(outputStream);
+                imageWriter.write(null, new IIOImage(enhancedImage, null, null), imageWriteParam);
+            } finally {
+                if (imageWriter != null) {
+                    imageWriter.dispose();
+                }
+            }
+
+            long resultKB = outputFile.length() / 1024;
+            logLine(logger, "  Result size: " + resultKB + " KB");
+            logLine(logger, "[DONE] " + outputFile.getName());
+
+        } catch (Exception e) {
+            if (logger != null) {
+                logLine(logger, "[ERROR] Exception on file: " + outputFile.getName());
+                logLine(logger, "  Message: " + e.getMessage());
+                e.printStackTrace(logger);
+            }
+            throw e;
         } finally {
-            if (imageWriter != null) {
-                imageWriter.dispose();
+            if (logger != null) {
+                logger.close();
             }
         }
     }
 
     public void compressToMaxSize(BufferedImage originalImage, File outputFile, float maxSizeKB, String formatName) throws IOException {
-        float quality = 1.0f; // Start with the highest quality
-        File tempFile = null;
-
         BufferedImage enhancedImage = preModify(originalImage, formatName);
+        java.io.PrintWriter logger = null;
 
-        // Loop until the compressed image is below or equal to maxSizeKB
-        do {
-            // Create a temporary file for size calculation
-            tempFile = File.createTempFile("tempCompressedImage", "." + formatName);
-            tempFile.deleteOnExit(); // Ensure the temp file is deleted on exit
+        try {
+            logger = new java.io.PrintWriter(new java.io.FileWriter("compress_log.txt", true));
 
-            // Configure the image writer and compression settings
-            ImageWriter imageWriter = ImageIO.getImageWritersByFormatName(formatName).next();
-            ImageWriteParam imageWriteParam = imageWriter.getDefaultWriteParam();
+            logLine(logger, "========================================");
+            logLine(logger, "[START] File: " + outputFile.getName());
+            logLine(logger, "  Mode       : Compress by Size");
+            logLine(logger, "  Format     : " + formatName);
+            logLine(logger, "  Target     : " + maxSizeKB + " KB");
+            logLine(logger, "  Image Size : " + originalImage.getWidth() + "x" + originalImage.getHeight());
+            logLine(logger, "  Timestamp  : " + new java.util.Date());
 
-            if ("jpg".equalsIgnoreCase(formatName) || "jpeg".equalsIgnoreCase(formatName)) {
-                if (imageWriteParam.canWriteCompressed()) {
-                    imageWriteParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-                    imageWriteParam.setCompressionQuality(quality);
+            if ("png".equalsIgnoreCase(formatName)) {
+                logLine(logger, "  [PNG] Lossless — writing directly.");
+                ImageWriter imageWriter = ImageIO.getImageWritersByFormatName("png").next();
+                try (ImageOutputStream outputStream = ImageIO.createImageOutputStream(outputFile)) {
+                    imageWriter.setOutput(outputStream);
+                    imageWriter.write(null, new IIOImage(enhancedImage, null, null), imageWriter.getDefaultWriteParam());
+                } finally {
+                    imageWriter.dispose();
                 }
-            } else if ("webp".equalsIgnoreCase(formatName)) {
-                WebPWriteParam writeParam = new WebPWriteParam(imageWriter.getLocale());
-                writeParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-
-                String[] compressionTypes = writeParam.getCompressionTypes();
-                if (compressionTypes != null && compressionTypes.length > 0) {
-                    writeParam.setCompressionType(compressionTypes[WebPWriteParam.LOSSY_COMPRESSION]);
-                }
-
-                writeParam.setCompressionQuality(quality);
-                imageWriteParam = writeParam;
+                long resultKB = outputFile.length() / 1024;
+                logLine(logger, "  Result size: " + resultKB + " KB");
+                logLine(logger, "[DONE] PNG written: " + outputFile.getName());
+                return;
             }
 
-            // Write the compressed image to the temporary file
-            try (ImageOutputStream outputStream = ImageIO.createImageOutputStream(tempFile)) {
-                imageWriter.setOutput(outputStream);
-                imageWriter.write(null, new IIOImage(enhancedImage, null, null), imageWriteParam);
-            } finally {
-                imageWriter.dispose();
-            }
+            File tempFile = null;
+            try {
+                // ── Phase 1 ───────────────────────────────────────────
+                logLine(logger, "  [Phase 1] Quality reduction at full resolution");
+                int qualityInt = 100;
+                while (qualityInt >= 10) {
+                    float quality = qualityInt / 100.0f;
+                    if (tempFile != null && tempFile.exists()) {
+                        tempFile.delete();
+                    }
+                    tempFile = File.createTempFile("tempImg_", "." + formatName);
+                    tempFile.deleteOnExit();
 
-            // Check the size of the temporary file
-            if (tempFile.length() / 1024 <= maxSizeKB) {
-                // If the size is within the limit, copy to the final output file
+                    logLine(logger, "    quality=" + String.format("%.2f", quality) + " | writing...");
+                    writeImage(enhancedImage, tempFile, formatName, quality);
+
+                    long fileSizeKB = tempFile.length() / 1024;
+                    logLine(logger, "    quality=" + String.format("%.2f", quality)
+                            + " | result=" + fileSizeKB + " KB (target=" + maxSizeKB + " KB)");
+
+                    if (fileSizeKB <= maxSizeKB) {
+                        Files.copy(tempFile.toPath(), outputFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                        logLine(logger, "    [OK] Size met at quality=" + String.format("%.2f", quality));
+                        logLine(logger, "[DONE] " + outputFile.getName());
+                        return;
+                    }
+                    qualityInt -= 10;
+                }
+
+                logLine(logger, "  [Phase 1] Could not meet target with quality reduction alone.");
+                logLine(logger, "  [Phase 2] Scaling down dimensions...");
+
+                // ── Phase 2 ───────────────────────────────────────────
+                int scalePercent = 90;
+                while (scalePercent >= 10) {
+                    int newWidth = Math.max(1, (int) (enhancedImage.getWidth() * (scalePercent / 100.0)));
+                    int newHeight = Math.max(1, (int) (enhancedImage.getHeight() * (scalePercent / 100.0)));
+
+                    logLine(logger, "    scale=" + scalePercent + "% | new size="
+                            + newWidth + "x" + newHeight + " | writing...");
+
+                    BufferedImage scaled = new BufferedImage(newWidth, newHeight, enhancedImage.getType());
+                    Graphics2D g2d = scaled.createGraphics();
+                    g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                    g2d.drawImage(enhancedImage, 0, 0, newWidth, newHeight, null);
+                    g2d.dispose();
+
+                    if (tempFile != null && tempFile.exists()) {
+                        tempFile.delete();
+                    }
+                    tempFile = File.createTempFile("tempImg_", "." + formatName);
+                    tempFile.deleteOnExit();
+
+                    writeImage(scaled, tempFile, formatName, 0.5f);
+
+                    long fileSizeKB = tempFile.length() / 1024;
+                    logLine(logger, "    scale=" + scalePercent + "% | result="
+                            + fileSizeKB + " KB (target=" + maxSizeKB + " KB)");
+
+                    if (fileSizeKB <= maxSizeKB) {
+                        Files.copy(tempFile.toPath(), outputFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                        logLine(logger, "    [OK] Size met at scale=" + scalePercent + "%");
+                        logLine(logger, "[DONE] " + outputFile.getName());
+                        return;
+                    }
+                    scalePercent -= 10;
+                }
+
+                // ── Phase 3 ───────────────────────────────────────────
+                logLine(logger, "  [Phase 3] Could not meet target even at 10% scale. Saving best effort.");
                 Files.copy(tempFile.toPath(), outputFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                break;
+                logLine(logger, "[DONE] " + outputFile.getName() + " (best effort — target not met)");
+
+            } finally {
+                if (tempFile != null && tempFile.exists()) {
+                    tempFile.delete();
+                }
             }
 
-            // Reduce quality and try again
-            quality -= 0.1f; // Decrease quality
-            quality = Math.max(quality, 0.1f); // Ensure quality does not drop below 0.1
-
-        } while (tempFile.length() / 1024 > maxSizeKB); // Check the size in KB
+        } catch (Exception e) {
+            if (logger != null) {
+                logLine(logger, "[ERROR] Exception on file: " + outputFile.getName());
+                logLine(logger, "  Message: " + e.getMessage());
+                e.printStackTrace(logger);
+            }
+            throw e;
+        } finally {
+            if (logger != null) {
+                logger.close();
+            }
+        }
     }
 
+    private void writeImage(BufferedImage image, File outputFile, String formatName, float quality) throws IOException {
+        ImageWriter imageWriter = ImageIO.getImageWritersByFormatName(formatName).next();
+        ImageWriteParam imageWriteParam = imageWriter.getDefaultWriteParam();
+
+        if ("jpg".equalsIgnoreCase(formatName) || "jpeg".equalsIgnoreCase(formatName)) {
+            if (imageWriteParam.canWriteCompressed()) {
+                imageWriteParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+                imageWriteParam.setCompressionQuality(quality);
+            }
+        } else if ("webp".equalsIgnoreCase(formatName)) {
+            WebPWriteParam writeParam = new WebPWriteParam(imageWriter.getLocale());
+            writeParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+            String[] compressionTypes = writeParam.getCompressionTypes();
+            if (compressionTypes != null && compressionTypes.length > 0) {
+                writeParam.setCompressionType(compressionTypes[WebPWriteParam.LOSSY_COMPRESSION]);
+            }
+            writeParam.setCompressionQuality(quality);
+            imageWriteParam = writeParam;
+        }
+
+        try (ImageOutputStream outputStream = ImageIO.createImageOutputStream(outputFile)) {
+            imageWriter.setOutput(outputStream);
+            imageWriter.write(null, new IIOImage(image, null, null), imageWriteParam);
+        } finally {
+            imageWriter.dispose();
+        }
+    }
+
+// Helper to avoid repeating writer code
+//    private void writeImage(BufferedImage image, File outputFile, String formatName, float quality) throws IOException {
+//        ImageWriter imageWriter = ImageIO.getImageWritersByFormatName(formatName).next();
+//        ImageWriteParam imageWriteParam = imageWriter.getDefaultWriteParam();
+//
+//        if ("jpg".equalsIgnoreCase(formatName) || "jpeg".equalsIgnoreCase(formatName)) {
+//            if (imageWriteParam.canWriteCompressed()) {
+//                imageWriteParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+//                imageWriteParam.setCompressionQuality(quality);
+//            }
+//        } else if ("webp".equalsIgnoreCase(formatName)) {
+//            WebPWriteParam writeParam = new WebPWriteParam(imageWriter.getLocale());
+//            writeParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+//            String[] compressionTypes = writeParam.getCompressionTypes();
+//            if (compressionTypes != null && compressionTypes.length > 0) {
+//                writeParam.setCompressionType(compressionTypes[WebPWriteParam.LOSSY_COMPRESSION]);
+//            }
+//            writeParam.setCompressionQuality(quality);
+//            imageWriteParam = writeParam;
+//        }
+//
+//        try (ImageOutputStream outputStream = ImageIO.createImageOutputStream(outputFile)) {
+//            imageWriter.setOutput(outputStream);
+//            imageWriter.write(null, new IIOImage(image, null, null), imageWriteParam);
+//        } finally {
+//            imageWriter.dispose();
+//        }
+//    }
     public static void main(String args[]) {
         //FlatRobotoFont.install();
         FlatLaf.registerCustomDefaultsSource("themes");
@@ -994,11 +1151,14 @@ public class Main extends javax.swing.JFrame {
         jPanel27 = new javax.swing.JPanel();
         jPanel28 = new javax.swing.JPanel();
         generateImage = new javax.swing.JButton();
+        logDisplay = new javax.swing.JButton();
+        logPanel = new javax.swing.JPanel();
+        CurrentLogLine = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setTitle("Bulk Image Modifier");
         setName("imageModifier"); // NOI18N
-        setPreferredSize(new java.awt.Dimension(700, 520));
+        setPreferredSize(new java.awt.Dimension(700, 560));
         setResizable(false);
 
         TopPanel.setPreferredSize(new java.awt.Dimension(550, 150));
@@ -1077,9 +1237,9 @@ public class Main extends javax.swing.JFrame {
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addComponent(jSeparator1))
             .addGroup(TopPanelLayout.createSequentialGroup()
-                .addContainerGap(32, Short.MAX_VALUE)
+                .addContainerGap(17, Short.MAX_VALUE)
                 .addComponent(jSeparator2, javax.swing.GroupLayout.PREFERRED_SIZE, 616, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(33, Short.MAX_VALUE))
+                .addContainerGap(17, Short.MAX_VALUE))
             .addGroup(TopPanelLayout.createSequentialGroup()
                 .addGap(72, 72, 72)
                 .addComponent(browseArea, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -1114,7 +1274,7 @@ public class Main extends javax.swing.JFrame {
         jPanel6Layout.setHorizontalGroup(
             jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel6Layout.createSequentialGroup()
-                .addContainerGap(57, Short.MAX_VALUE)
+                .addContainerGap(56, Short.MAX_VALUE)
                 .addComponent(CompressBylbl)
                 .addGap(25, 25, 25))
         );
@@ -1146,7 +1306,7 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(compressBySize)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(compressByDim)
-                .addContainerGap(302, Short.MAX_VALUE))
+                .addContainerGap(273, Short.MAX_VALUE))
         );
         jPanel7Layout.setVerticalGroup(
             jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1201,7 +1361,7 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(maxSize, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jLabel2)
-                .addContainerGap(435, Short.MAX_VALUE))
+                .addContainerGap(406, Short.MAX_VALUE))
         );
         jPanel12Layout.setVerticalGroup(
             jPanel12Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1264,7 +1424,7 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(dimH, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jLabel3)
-                .addContainerGap(348, Short.MAX_VALUE))
+                .addContainerGap(321, Short.MAX_VALUE))
         );
         jPanel19Layout.setVerticalGroup(
             jPanel19Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1292,7 +1452,7 @@ public class Main extends javax.swing.JFrame {
         jPanel22Layout.setHorizontalGroup(
             jPanel22Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel22Layout.createSequentialGroup()
-                .addContainerGap(88, Short.MAX_VALUE)
+                .addContainerGap(87, Short.MAX_VALUE)
                 .addComponent(CompressBylbl4)
                 .addGap(25, 25, 25))
         );
@@ -1322,7 +1482,7 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(percentage, javax.swing.GroupLayout.PREFERRED_SIZE, 256, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(18, 18, 18)
                 .addComponent(percentageLbl, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(223, Short.MAX_VALUE))
+                .addContainerGap(194, Short.MAX_VALUE))
         );
         jPanel23Layout.setVerticalGroup(
             jPanel23Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1345,7 +1505,7 @@ public class Main extends javax.swing.JFrame {
         jPanel24.setLayout(jPanel24Layout);
         jPanel24Layout.setHorizontalGroup(
             jPanel24Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 151, Short.MAX_VALUE)
+            .addGap(0, 150, Short.MAX_VALUE)
         );
         jPanel24Layout.setVerticalGroup(
             jPanel24Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1361,7 +1521,7 @@ public class Main extends javax.swing.JFrame {
             .addGroup(jPanel25Layout.createSequentialGroup()
                 .addGap(15, 15, 15)
                 .addComponent(jSeparator3, javax.swing.GroupLayout.PREFERRED_SIZE, 335, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(179, Short.MAX_VALUE))
+                .addContainerGap(150, Short.MAX_VALUE))
         );
         jPanel25Layout.setVerticalGroup(
             jPanel25Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1377,7 +1537,7 @@ public class Main extends javax.swing.JFrame {
         MainCenterPanel.setLayout(MainCenterPanelLayout);
         MainCenterPanelLayout.setHorizontalGroup(
             MainCenterPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(byOption, javax.swing.GroupLayout.DEFAULT_SIZE, 681, Short.MAX_VALUE)
+            .addComponent(byOption, javax.swing.GroupLayout.DEFAULT_SIZE, 650, Short.MAX_VALUE)
             .addComponent(SizeCompression, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
             .addComponent(DimCompression, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
             .addComponent(seper, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
@@ -1401,8 +1561,6 @@ public class Main extends javax.swing.JFrame {
 
         getContentPane().add(MainCenterPanel, java.awt.BorderLayout.CENTER);
 
-        bottomPanel.setPreferredSize(new java.awt.Dimension(550, 250));
-
         brightnessPanel.setPreferredSize(new java.awt.Dimension(550, 30));
         brightnessPanel.setLayout(new javax.swing.BoxLayout(brightnessPanel, javax.swing.BoxLayout.LINE_AXIS));
 
@@ -1415,7 +1573,7 @@ public class Main extends javax.swing.JFrame {
         jPanel29Layout.setHorizontalGroup(
             jPanel29Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel29Layout.createSequentialGroup()
-                .addContainerGap(71, Short.MAX_VALUE)
+                .addContainerGap(70, Short.MAX_VALUE)
                 .addComponent(sizeLbl3)
                 .addGap(25, 25, 25))
         );
@@ -1456,7 +1614,7 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(brightLbl, javax.swing.GroupLayout.PREFERRED_SIZE, 39, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(resetBright, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(222, Short.MAX_VALUE))
+                .addContainerGap(205, Short.MAX_VALUE))
         );
         jPanel30Layout.setVerticalGroup(
             jPanel30Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1483,7 +1641,7 @@ public class Main extends javax.swing.JFrame {
         jPanel33Layout.setHorizontalGroup(
             jPanel33Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel33Layout.createSequentialGroup()
-                .addContainerGap(73, Short.MAX_VALUE)
+                .addContainerGap(72, Short.MAX_VALUE)
                 .addComponent(sizeLbl6)
                 .addGap(25, 25, 25))
         );
@@ -1523,7 +1681,7 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(sharpLbl, javax.swing.GroupLayout.PREFERRED_SIZE, 39, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(resetSharp, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(222, Short.MAX_VALUE))
+                .addContainerGap(193, Short.MAX_VALUE))
         );
         jPanel34Layout.setVerticalGroup(
             jPanel34Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1552,7 +1710,7 @@ public class Main extends javax.swing.JFrame {
         jPanel13Layout.setHorizontalGroup(
             jPanel13Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel13Layout.createSequentialGroup()
-                .addContainerGap(52, Short.MAX_VALUE)
+                .addContainerGap(51, Short.MAX_VALUE)
                 .addComponent(sizeLbl1)
                 .addGap(25, 25, 25))
         );
@@ -1580,7 +1738,7 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(outputDir, javax.swing.GroupLayout.PREFERRED_SIZE, 108, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(5, 5, 5)
                 .addComponent(jLabel4)
-                .addContainerGap(252, Short.MAX_VALUE))
+                .addContainerGap(235, Short.MAX_VALUE))
         );
         jPanel14Layout.setVerticalGroup(
             jPanel14Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1605,7 +1763,7 @@ public class Main extends javax.swing.JFrame {
         jPanel15Layout.setHorizontalGroup(
             jPanel15Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel15Layout.createSequentialGroup()
-                .addContainerGap(47, Short.MAX_VALUE)
+                .addContainerGap(46, Short.MAX_VALUE)
                 .addComponent(sizeLbl2)
                 .addGap(25, 25, 25))
         );
@@ -1656,7 +1814,7 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(noBg)
                 .addGap(26, 26, 26)
                 .addComponent(jLabel6)
-                .addContainerGap(71, Short.MAX_VALUE))
+                .addContainerGap(53, Short.MAX_VALUE))
         );
         jPanel16Layout.setVerticalGroup(
             jPanel16Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1702,7 +1860,7 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(generateProgress, javax.swing.GroupLayout.PREFERRED_SIZE, 314, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(18, 18, 18)
                 .addComponent(openDirLbl)
-                .addContainerGap(110, Short.MAX_VALUE))
+                .addContainerGap(92, Short.MAX_VALUE))
         );
         jPanel26Layout.setVerticalGroup(
             jPanel26Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1724,7 +1882,7 @@ public class Main extends javax.swing.JFrame {
         jPanel27.setLayout(jPanel27Layout);
         jPanel27Layout.setHorizontalGroup(
             jPanel27Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 151, Short.MAX_VALUE)
+            .addGap(0, 150, Short.MAX_VALUE)
         );
         jPanel27Layout.setVerticalGroup(
             jPanel27Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1738,41 +1896,70 @@ public class Main extends javax.swing.JFrame {
         generateImage.setAlignmentX(0.2F);
         generateImage.setIconTextGap(10);
 
+        logDisplay.setText("Log");
+        logDisplay.setEnabled(false);
+
         javax.swing.GroupLayout jPanel28Layout = new javax.swing.GroupLayout(jPanel28);
         jPanel28.setLayout(jPanel28Layout);
         jPanel28Layout.setHorizontalGroup(
             jPanel28Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel28Layout.createSequentialGroup()
-                .addGap(0, 0, 0)
+                .addContainerGap()
                 .addComponent(generateImage)
-                .addContainerGap(410, Short.MAX_VALUE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(logDisplay, javax.swing.GroupLayout.PREFERRED_SIZE, 51, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(330, Short.MAX_VALUE))
         );
         jPanel28Layout.setVerticalGroup(
             jPanel28Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel28Layout.createSequentialGroup()
-                .addComponent(generateImage, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGroup(jPanel28Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(generateImage, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(logDisplay))
                 .addGap(0, 8, Short.MAX_VALUE))
         );
 
         outputFormatPanel1.add(jPanel28);
 
+        logPanel.setBackground(new java.awt.Color(225, 225, 225));
+
+        CurrentLogLine.setForeground(new java.awt.Color(86, 126, 77));
+        CurrentLogLine.setText("---");
+
+        javax.swing.GroupLayout logPanelLayout = new javax.swing.GroupLayout(logPanel);
+        logPanel.setLayout(logPanelLayout);
+        logPanelLayout.setHorizontalGroup(
+            logPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, logPanelLayout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(CurrentLogLine, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+        );
+        logPanelLayout.setVerticalGroup(
+            logPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, logPanelLayout.createSequentialGroup()
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(CurrentLogLine)
+                .addContainerGap())
+        );
+
         javax.swing.GroupLayout bottomPanelLayout = new javax.swing.GroupLayout(bottomPanel);
         bottomPanel.setLayout(bottomPanelLayout);
         bottomPanelLayout.setHorizontalGroup(
             bottomPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(bottomPanelLayout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(bottomPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(brightnessPanel, javax.swing.GroupLayout.DEFAULT_SIZE, 669, Short.MAX_VALUE)
-                    .addComponent(outputDirPanel, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 669, Short.MAX_VALUE)
-                    .addComponent(outputFormatPanel, javax.swing.GroupLayout.DEFAULT_SIZE, 669, Short.MAX_VALUE)
-                    .addComponent(GenerateProgress, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 669, Short.MAX_VALUE)
-                    .addComponent(outputFormatPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, 669, Short.MAX_VALUE))
-                .addContainerGap())
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, bottomPanelLayout.createSequentialGroup()
+                .addGap(0, 0, 0)
+                .addGroup(bottomPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                    .addComponent(brightnessPanel, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, 650, Short.MAX_VALUE)
+                    .addComponent(outputDirPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(outputFormatPanel, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(GenerateProgress, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(outputFormatPanel1, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(logPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addGap(0, 0, 0))
             .addGroup(bottomPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                 .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, bottomPanelLayout.createSequentialGroup()
                     .addContainerGap()
-                    .addComponent(SharpnessPanel, javax.swing.GroupLayout.DEFAULT_SIZE, 669, Short.MAX_VALUE)
+                    .addComponent(SharpnessPanel, javax.swing.GroupLayout.DEFAULT_SIZE, 638, Short.MAX_VALUE)
                     .addContainerGap()))
         );
         bottomPanelLayout.setVerticalGroup(
@@ -1788,12 +1975,13 @@ public class Main extends javax.swing.JFrame {
                 .addComponent(GenerateProgress, javax.swing.GroupLayout.PREFERRED_SIZE, 21, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(outputFormatPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, 40, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(32, Short.MAX_VALUE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 34, Short.MAX_VALUE)
+                .addComponent(logPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
             .addGroup(bottomPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                 .addGroup(bottomPanelLayout.createSequentialGroup()
                     .addGap(37, 37, 37)
                     .addComponent(SharpnessPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addContainerGap(183, Short.MAX_VALUE)))
+                    .addContainerGap(213, Short.MAX_VALUE)))
         );
 
         getContentPane().add(bottomPanel, java.awt.BorderLayout.PAGE_END);
@@ -1838,6 +2026,7 @@ public class Main extends javax.swing.JFrame {
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JLabel CompressBylbl;
     private javax.swing.JLabel CompressBylbl4;
+    private javax.swing.JLabel CurrentLogLine;
     private javax.swing.JPanel DimCompression;
     private javax.swing.JPanel GenerateProgress;
     private javax.swing.JPanel MainCenterPanel;
@@ -1896,6 +2085,8 @@ public class Main extends javax.swing.JFrame {
     private javax.swing.JSeparator jSeparator2;
     private javax.swing.JSeparator jSeparator3;
     private javax.swing.JTabbedPane jTabbedPane1;
+    private javax.swing.JButton logDisplay;
+    private javax.swing.JPanel logPanel;
     private javax.swing.JTextField maxSize;
     private javax.swing.JCheckBox noBg;
     private javax.swing.JLabel openDirLbl;
